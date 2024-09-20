@@ -39,6 +39,8 @@ impl BotService {
                     self.handle_help_command(chat_id);
                 } else if message.text.as_deref() == Some("/start") {
                     self.handle_start_command(chat_id, telegram_user_id)?;
+                } else if message.text.as_deref() == Some("/stats") {
+                    self.handle_stats_command(chat_id)?;
                 } else if let Some(text) = message.text {
                     self.handle_text_answer(text, chat_id, telegram_user_id)?;
                 }
@@ -61,11 +63,26 @@ impl BotService {
         Ok(())
     }
 
+    fn handle_stats_command(&mut self, chat_id: i64, ) -> Result<(), Box<dyn Error>> {
+        let welcome_message = "Coming soon";
+        self.telegram_client.send_question(chat_id, welcome_message)?;
+        Ok(())
+    }
+
     fn handle_start_command(
         &mut self,
         chat_id: i64,
         telegram_user_id: u64,
     ) -> Result<(), Box<dyn Error>> {
+        let welcome_message = "\
+        Welcome to 'El la la' game.\n\n\
+        Your knowledge on Spanish nouns' gender is going to be tested.\n\
+        Type /help for further information.\
+        ";
+        self.telegram_client.send_question(chat_id, welcome_message)?;
+
+        self.clean_up_plays(telegram_user_id)?;
+
         let noun = self.nouns_repo.get_random()?;
         let user = self.users_repo.get(telegram_user_id)?.unwrap();
         self.user_plays_repo.insert(user.id, noun.id)?;
@@ -84,17 +101,23 @@ impl BotService {
         chat_id: i64,
         telegram_user_id: u64,
     ) -> Result<(), Box<dyn Error>> {
-        println!("Stopping for {}", telegram_user_id);
+        println!("Stopping the game for {}", telegram_user_id);
 
+        self.clean_up_plays(telegram_user_id)?;
+
+        let text = "Stopping the game for now.\n\
+        Send /help for further information\
+        ";
+        self.telegram_client.send_message(chat_id, text)?;
+        Ok(())
+    }
+
+    fn clean_up_plays(&mut self, telegram_user_id: u64) -> Result<(), Box<dyn Error>> {
         if let Some(user) = self.users_repo.get(telegram_user_id)? {
             if let Some(current_play) = self.user_plays_repo.get_last(user.id)? {
                 self.user_plays_repo.remove(current_play.id)?;
             }
-
-            let text = "Stopping the game for now.\nSend /help for further information";
-            self.telegram_client.send_message(chat_id, text)?;
         }
-
         Ok(())
     }
 
