@@ -2,7 +2,7 @@ use frankenstein::{
     Api, GetUpdatesParams, KeyboardButton, Message, MethodResponse, ReplyKeyboardMarkup,
     ReplyMarkup, SendMessageParams, TelegramApi, Update,
 };
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::Sender;
 use std::{env, thread};
 
 pub struct TelegramClient {
@@ -11,19 +11,17 @@ pub struct TelegramClient {
 }
 
 impl TelegramClient {
-    pub fn new() -> (Self, Receiver<Update>) {
+    pub fn new(channel_sender: Sender<Update>) -> Self {
         let token: String = env::var("TELEGRAM_BOT_TOKEN").expect("Bot token not found");
         let api: Api = Api::new(token.as_str());
         let question_keyboard: ReplyMarkup = Self::build_keyboard();
-        let (update_sender, update_receiver): (Sender<Update>, Receiver<Update>) = channel();
 
         let api_clone: Api = api.clone();
         thread::spawn(move || {
-            Self::poll_updates(api_clone, update_sender);
+            Self::poll_updates(api_clone, channel_sender);
         });
 
-        let client = Self { api, question_keyboard };
-        (client, update_receiver)
+        Self { api, question_keyboard }
     }
 
     pub fn send_message(
