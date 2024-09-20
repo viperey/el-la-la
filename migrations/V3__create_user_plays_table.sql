@@ -1,5 +1,3 @@
--- migrations/V4__create_user_plays_table.sql
-
 CREATE TABLE user_plays
 (
     id        INT AUTO_INCREMENT PRIMARY KEY,

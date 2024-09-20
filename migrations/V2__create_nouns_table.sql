@@ -1,5 +1,3 @@
--- V2__create_nouns_table.sql
-
 CREATE TABLE nouns
 (
     id       INT AUTO_INCREMENT PRIMARY KEY,
