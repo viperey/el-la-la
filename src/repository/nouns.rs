@@ -1,8 +1,8 @@
-use std::error::Error;
-use mysql::{params, PooledConn};
-use mysql::prelude::Queryable;
 use crate::domain::{Gender, Noun};
 use crate::repository::connector;
+use mysql::prelude::Queryable;
+use mysql::{params, PooledConn};
+use std::error::Error;
 
 pub struct NounsRepository {
     conn: PooledConn,
@@ -14,7 +14,12 @@ impl NounsRepository {
         NounsRepository { conn }
     }
 
-    fn build(id: i32, english: String, spanish: String, gender_str: String) -> Result<Noun, Box<dyn Error>> {
+    fn build(
+        id: i32,
+        english: String,
+        spanish: String,
+        gender_str: String,
+    ) -> Result<Noun, Box<dyn Error>> {
         let gender: Gender = match gender_str.as_str() {
             "masculine" => Gender::Masculine,
             "feminine" => Gender::Feminine,

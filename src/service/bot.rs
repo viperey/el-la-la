@@ -1,11 +1,10 @@
 use crate::client::telegram::TelegramClient;
-use crate::domain::{Gender, User, UserPlay};
+use crate::domain::{Gender, Noun, User, UserPlay};
 use crate::repository::nouns::{NounsRepository, NounsRepositoryTrait};
 use crate::repository::user_plays::{UserPlaysRepository, UserPlaysRepositoryTrait};
 use crate::repository::users::{UsersRepository, UsersRepositoryTrait};
-use frankenstein::{
-    Update, UpdateContent,
-};
+use frankenstein::{Update, UpdateContent};
+use std::env::VarError::NotPresent;
 use std::error::Error;
 use std::sync::mpsc::Receiver;
 
@@ -29,7 +28,7 @@ impl BotService {
     pub fn run(&mut self, update_receiver: Receiver<Update>) -> Result<(), Box<dyn Error>> {
         for update in update_receiver {
             if let UpdateContent::Message(message) = update.content {
-                let chat_id = message.chat.id;
+                let chat_id: i64 = message.chat.id;
                 let telegram_user_id: u64 = message.from.unwrap().id;
                 self.ensure_user_exists(telegram_user_id)?;
 
@@ -51,7 +50,7 @@ impl BotService {
     }
 
     fn ensure_user_exists(&mut self, telegram_user_id: u64) -> Result<(), Box<dyn Error>> {
-        let user = self.users_repo.get(telegram_user_id)?;
+        let user: Option<User> = self.users_repo.get(telegram_user_id)?;
 
         if user.is_none() {
             let new_user = User {
@@ -63,9 +62,10 @@ impl BotService {
         Ok(())
     }
 
-    fn handle_stats_command(&mut self, chat_id: i64, ) -> Result<(), Box<dyn Error>> {
+    fn handle_stats_command(&mut self, chat_id: i64) -> Result<(), Box<dyn Error>> {
         let welcome_message = "Coming soon";
-        self.telegram_client.send_question(chat_id, welcome_message)?;
+        self.telegram_client
+            .send_question(chat_id, welcome_message)?;
         Ok(())
     }
 
@@ -79,12 +79,13 @@ impl BotService {
         Your knowledge on Spanish nouns' gender is going to be tested.\n\
         Type /help for further information.\
         ";
-        self.telegram_client.send_question(chat_id, welcome_message)?;
+        self.telegram_client
+            .send_question(chat_id, welcome_message)?;
 
         self.clean_up_plays(telegram_user_id)?;
 
-        let noun = self.nouns_repo.get_random()?;
-        let user = self.users_repo.get(telegram_user_id)?.unwrap();
+        let noun: Noun = self.nouns_repo.get_random()?;
+        let user: User = self.users_repo.get(telegram_user_id)?.unwrap();
         self.user_plays_repo.insert(user.id, noun.id)?;
 
         let message_text = format!(
@@ -113,12 +114,26 @@ impl BotService {
     }
 
     fn clean_up_plays(&mut self, telegram_user_id: u64) -> Result<(), Box<dyn Error>> {
-        if let Some(user) = self.users_repo.get(telegram_user_id)? {
-            if let Some(current_play) = self.user_plays_repo.get_last(user.id)? {
-                self.user_plays_repo.remove(current_play.id)?;
-            }
-        }
-        Ok(())
+        self.get_user(telegram_user_id)
+            .and_then(|user| self.remove_user_last_play(user.id))
+    }
+
+    fn remove_user_last_play(&mut self, user_id: i32) -> Result<(), Box<dyn Error>> {
+        self.user_plays_repo
+            .get_last(user_id)
+            .and_then(|maybe_user| match maybe_user {
+                Some(user_play) => self.user_plays_repo.remove(user_play.id),
+                None => Ok(()),
+            })
+    }
+
+    fn get_user(&mut self, telegram_user_id: u64) -> Result<User, Box<dyn Error>> {
+        self.users_repo
+            .get(telegram_user_id)
+            .and_then(|maybe_user| match maybe_user {
+                Some(user) => Ok(user),
+                None => Err(NotPresent.into()),
+            })
     }
 
     fn handle_help_command(&self, chat_id: i64) {
@@ -136,41 +151,29 @@ impl BotService {
         chat_id: i64,
         telegram_user_id: u64,
     ) -> Result<(), Box<dyn Error>> {
-        let current_play = self.get_current_play(telegram_user_id)?;
-
-        let playing_noun = self.nouns_repo.get(current_play.noun_id)?;
-
+        let current_play: UserPlay = self.get_current_play(telegram_user_id)?;
+        let playing_noun: Noun = self.nouns_repo.get(current_play.noun_id)?;
         let correct_answer: &str = match playing_noun.gender {
             Gender::Masculine => "Masculine",
             Gender::Feminine => "Feminine",
             Gender::Any => "Any",
         };
-
         let user_answer: &str = text_answer.as_str();
+        let is_correct: bool = user_answer == correct_answer;
+        self.user_plays_repo.update(current_play.id, is_correct)?;
 
-        let is_correct = user_answer == correct_answer;
-
-        self.user_plays_repo
-            .update(current_play.id, is_correct)?;
-
-        let message_text = if is_correct { "Correct!" } else { "Wrong!" };
-
+        let message_text: &str = if is_correct { "Correct!" } else { "Wrong!" };
         self.telegram_client.send_message(chat_id, message_text)?;
 
-        let new_noun = self.nouns_repo.get_random()?;
-
-        let user = self
-            .users_repo
-            .get(telegram_user_id)?
-            .unwrap();
+        let new_noun: Noun = self.nouns_repo.get_random()?;
+        let user = self.users_repo.get(telegram_user_id)?.unwrap();
         self.user_plays_repo.insert(user.id, new_noun.id)?;
-
         let question_text = format!(
             "What's the gender of '{}' ({})?",
             new_noun.spanish, new_noun.english
         );
-
-        self.telegram_client.send_question(chat_id, &question_text)?;
+        self.telegram_client
+            .send_question(chat_id, &question_text)?;
         Ok(())
     }
 

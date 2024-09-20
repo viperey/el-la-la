@@ -1,5 +1,5 @@
-use mysql::PooledConn;
 use crate::repository::connector;
+use mysql::PooledConn;
 
 mod embedded {
     use refinery::embed_migrations;

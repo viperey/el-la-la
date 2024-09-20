@@ -1,11 +1,14 @@
-use frankenstein::{Api, BotCommand, GetUpdatesParams, KeyboardButton, Message, MethodResponse, ReplyKeyboardMarkup, ReplyMarkup, SendMessageParams, SetMyCommandsParams, TelegramApi, Update};
+use frankenstein::{
+    Api, BotCommand, GetUpdatesParams, KeyboardButton, Message, MethodResponse,
+    ReplyKeyboardMarkup, ReplyMarkup, SendMessageParams, SetMyCommandsParams, TelegramApi, Update,
+};
+use std::error::Error;
 use std::sync::mpsc::Sender;
 use std::{env, thread};
-use std::error::Error;
 
 pub struct TelegramClient {
     api: Api,
-    question_keyboard: ReplyMarkup
+    question_keyboard: ReplyMarkup,
 }
 
 impl TelegramClient {
@@ -20,7 +23,10 @@ impl TelegramClient {
         });
 
         Self::set_bot_commands(&api).expect("Failed to set bot commands");
-        Self { api, question_keyboard }
+        Self {
+            api,
+            question_keyboard,
+        }
     }
 
     pub fn send_message(
@@ -70,9 +76,7 @@ impl TelegramClient {
                 .build(),
         ];
 
-        let params = SetMyCommandsParams::builder()
-            .commands(commands)
-            .build();
+        let params = SetMyCommandsParams::builder().commands(commands).build();
 
         api.set_my_commands(&params)?;
 
@@ -106,9 +110,8 @@ impl TelegramClient {
             KeyboardButton::builder().text("Feminine").build(),
             KeyboardButton::builder().text("Any").build(),
         ];
-        let keyboard_markup: ReplyKeyboardMarkup = ReplyKeyboardMarkup::builder()
-            .keyboard(vec![row])
-            .build();
+        let keyboard_markup: ReplyKeyboardMarkup =
+            ReplyKeyboardMarkup::builder().keyboard(vec![row]).build();
         ReplyMarkup::ReplyKeyboardMarkup(keyboard_markup)
     }
 }

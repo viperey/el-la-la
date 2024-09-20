@@ -1,7 +1,7 @@
 use crate::domain::User;
+use crate::repository::connector;
 use mysql::{params, prelude::Queryable, PooledConn};
 use std::error::Error;
-use crate::repository::connector;
 
 pub struct UsersRepository {
     conn: PooledConn,
@@ -20,10 +20,7 @@ pub trait UsersRepositoryTrait {
 }
 
 impl UsersRepositoryTrait for UsersRepository {
-    fn get(
-        &mut self,
-        telegram_user_id: u64,
-    ) -> Result<Option<User>, Box<dyn Error>> {
+    fn get(&mut self, telegram_user_id: u64) -> Result<Option<User>, Box<dyn Error>> {
         let result: Option<(i32, u64)> = self.conn.exec_first(
             "SELECT id, telegram_user_id FROM users WHERE telegram_user_id = :telegram_user_id",
             params! {

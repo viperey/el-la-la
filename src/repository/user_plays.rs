@@ -51,12 +51,14 @@ impl UserPlaysRepositoryTrait for UserPlaysRepository {
     }
 
     fn get_last(&mut self, user_id: i32) -> Result<Option<UserPlay>, Box<dyn Error>> {
-        let result: Option<(i32, i32, i32, Option<bool>)> = self.conn.exec_first(
-            "SELECT id, user_id, noun_id, answer FROM user_plays WHERE user_id = :user_id ORDER BY timestamp DESC LIMIT 1",
-            params! {
-                "user_id" => user_id,
-            },
-        )?;
+        let statement: &str = "\
+            SELECT id, user_id, noun_id, answer \
+            FROM user_plays \
+            WHERE user_id = :user_id AND answer IS NULL \
+            ORDER BY timestamp DESC \
+            LIMIT 1";
+        let params = params! { "user_id" => user_id };
+        let result: Option<(i32, i32, i32, Option<bool>)> = self.conn.exec_first(statement, params)?;
         Self::build(result)
     }
     fn insert(&mut self, user_id: i32, noun_id: i32) -> Result<i32, Box<dyn Error>> {
