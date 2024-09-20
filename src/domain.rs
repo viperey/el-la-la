@@ -1,16 +1,11 @@
-use serde::Deserialize;
-
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Gender {
-    #[serde(alias = "masculine", alias = "M", alias = "m")]
     Masculine,
-    #[serde(alias = "feminine", alias = "F", alias = "f")]
     Feminine,
-    #[serde(alias = "any")]
     Any,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Noun {
     pub id: i32,
     pub english: String,
