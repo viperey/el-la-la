@@ -1,7 +1,7 @@
 use crate::domain::UserPlay;
 use crate::repository::connector;
 use mysql::prelude::Queryable;
-use mysql::{params, PooledConn};
+use mysql::{params, Params, PooledConn};
 use std::error::Error;
 
 pub struct UserPlaysRepository {
@@ -14,19 +14,13 @@ impl UserPlaysRepository {
         UserPlaysRepository { conn }
     }
 
-    fn build(
-        result: Option<(i32, i32, i32, Option<bool>)>,
-    ) -> Result<Option<UserPlay>, Box<dyn Error>> {
-        if let Some((id, user_id, noun_id, answer)) = result {
-            Ok(Some(UserPlay {
-                id,
-                user_id,
-                noun_id,
-                answer,
-            }))
-        } else {
-            Ok(None)
-        }
+    fn build(result: Option<(i32, i32, i32, Option<bool>)>) -> Option<UserPlay> {
+        result.map(|(id, user_id, noun_id, answer)| UserPlay {
+            id,
+            user_id,
+            noun_id,
+            answer,
+        })
     }
 }
 
@@ -40,14 +34,12 @@ pub trait UserPlaysRepositoryTrait {
 
 impl UserPlaysRepositoryTrait for UserPlaysRepository {
     fn get(&mut self, id: i32) -> Result<Option<UserPlay>, Box<dyn Error>> {
-        let result: Option<(i32, i32, i32, Option<bool>)> = self.conn.exec_first(
-            "SELECT id, user_id, noun_id, answer FROM user_plays WHERE id = :id",
-            params! {
-                "id" => id,
-            },
-        )?;
-
-        Self::build(result)
+        let statement: &str = "SELECT id, user_id, noun_id, answer FROM user_plays WHERE id = :id";
+        let params: Params = params! { "id" => id };
+        self.conn
+            .exec_first(statement, params)
+            .map(Self::build)
+            .map_err(|e| e.into())
     }
 
     fn get_last(&mut self, user_id: i32) -> Result<Option<UserPlay>, Box<dyn Error>> {
@@ -58,39 +50,37 @@ impl UserPlaysRepositoryTrait for UserPlaysRepository {
             ORDER BY timestamp DESC \
             LIMIT 1";
         let params = params! { "user_id" => user_id };
-        let result: Option<(i32, i32, i32, Option<bool>)> = self.conn.exec_first(statement, params)?;
-        Self::build(result)
+        self.conn
+            .exec_first(statement, params)
+            .map(Self::build)
+            .map_err(|e| e.into())
     }
     fn insert(&mut self, user_id: i32, noun_id: i32) -> Result<i32, Box<dyn Error>> {
-        self.conn.exec_drop(
-            "INSERT INTO user_plays (user_id, noun_id, answer) VALUES (:user_id, :noun_id, NULL)",
-            params! {
-                "user_id" => user_id,
-                "noun_id" => noun_id,
-            },
-        )?;
-        let play_id = self.conn.last_insert_id() as i32;
-        Ok(play_id)
+        let statement: &str = "\
+            INSERT INTO user_plays (user_id, noun_id) \
+            VALUES (:user_id, :noun_id)";
+        let params = params! {
+            "user_id" => user_id,
+            "noun_id" => noun_id,
+        };
+        self.conn
+            .exec_drop(statement, params)
+            .map_err(|e| e.into())
+            .map(|_| self.conn.last_insert_id() as i32)
     }
 
     fn update(&mut self, play_id: i32, answer: bool) -> Result<(), Box<dyn Error>> {
-        self.conn.exec_drop(
-            "UPDATE user_plays SET answer = :answer WHERE id = :id",
-            params! {
-                "id" => play_id,
-                "answer" => answer,
-            },
-        )?;
-        Ok(())
+        let statement: &str = "UPDATE user_plays SET answer = :answer WHERE id = :id";
+        let params: Params = params! {
+            "id" => play_id,
+            "answer" => answer,
+        };
+        self.conn.exec_drop(statement, params).map_err(|e| e.into())
     }
 
     fn remove(&mut self, play_id: i32) -> Result<(), Box<dyn Error>> {
-        self.conn.exec_drop(
-            "DELETE FROM user_plays WHERE id = :id",
-            params! {
-                "id" => play_id,
-            },
-        )?;
-        Ok(())
+        let statement: &str = "DELETE FROM user_plays WHERE id = :id";
+        let params: Params = params! {"id" => play_id};
+        self.conn.exec_drop(statement, params).map_err(|e| e.into())
     }
 }
