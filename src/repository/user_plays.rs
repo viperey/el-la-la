@@ -25,7 +25,6 @@ impl UserPlaysRepository {
 }
 
 pub trait UserPlaysRepositoryTrait {
-    fn get(&mut self, id: i32) -> Result<Option<UserPlay>, Box<dyn Error>>;
     fn get_last(&mut self, user_id: i32) -> Result<Option<UserPlay>, Box<dyn Error>>;
     fn insert(&mut self, user_id: i32, noun_id: i32) -> Result<i32, Box<dyn Error>>;
     fn update(&mut self, play_id: i32, answer: bool) -> Result<(), Box<dyn Error>>;
@@ -33,15 +32,6 @@ pub trait UserPlaysRepositoryTrait {
 }
 
 impl UserPlaysRepositoryTrait for UserPlaysRepository {
-    fn get(&mut self, id: i32) -> Result<Option<UserPlay>, Box<dyn Error>> {
-        let statement: &str = "SELECT id, user_id, noun_id, answer FROM user_plays WHERE id = :id";
-        let params: Params = params! { "id" => id };
-        self.conn
-            .exec_first(statement, params)
-            .map(Self::build)
-            .map_err(|e| e.into())
-    }
-
     fn get_last(&mut self, user_id: i32) -> Result<Option<UserPlay>, Box<dyn Error>> {
         let statement: &str = "\
             SELECT id, user_id, noun_id, answer \

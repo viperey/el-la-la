@@ -36,7 +36,7 @@ impl BotService {
 
                 match message.text.as_deref() {
                     Some("/stop") => self.handle_stop_command(chat_id, telegram_user_id)?,
-                    Some("/help") => self.handle_help_command(chat_id),
+                    Some("/help") => self.handle_help_command(chat_id)?,
                     Some("/start") => self.handle_start_command(chat_id, telegram_user_id)?,
                     Some("/stats") => self.handle_stats_command(chat_id)?,
                     Some(text) => {
@@ -147,13 +147,13 @@ impl BotService {
             })
     }
 
-    fn handle_help_command(&self, chat_id: i64) {
+    fn handle_help_command(&self, chat_id: i64) -> Result<(), Box<dyn Error>> {
         let text: &str = "\
             /start -> Play the game\n\
             /stop -> Stop the game\n\
             /stats -> Check your current playing statistics\n\
             ";
-        self.telegram_client.send_message(chat_id, text).unwrap();
+        self.telegram_client.send_message(chat_id, text).map(|_| ()).map_err(|e| e.into())
     }
 
     fn handle_text_answer(
