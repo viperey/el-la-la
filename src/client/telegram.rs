@@ -15,10 +15,10 @@ pub struct TelegramClient {
 impl TelegramClient {
     pub fn new(channel_sender: Sender<Update>) -> Self {
         let token: String = env::var("TELEGRAM_BOT_TOKEN").expect("Bot token not found");
-        let api: Api = Api::new(token.as_str());
         let question_keyboard: ReplyMarkup = Self::build_keyboard();
-        let api_clone: Api = api.clone();
 
+        let api: Api = Api::new(token.as_str());
+        let api_clone: Api = api.clone();
         Self::set_bot_commands(&api).expect("Failed to set bot commands");
         thread::spawn(move || Self::poll_updates(api_clone, channel_sender));
 
@@ -33,7 +33,7 @@ impl TelegramClient {
         chat_id: i64,
         message_id: i32,
         reaction: &str,
-    ) -> Result<MethodResponse<bool>, frankenstein::Error> {
+    ) -> Result<(), Box<dyn Error>> {
         let set_message_reaction_params = SetMessageReactionParams::builder()
             .chat_id(chat_id)
             .message_id(message_id)
@@ -42,6 +42,8 @@ impl TelegramClient {
             })])
             .build();
         self.api.set_message_reaction(&set_message_reaction_params)
+            .map(|_| ())
+            .map_err(|e| e.into())
     }
 
     pub fn send_message(

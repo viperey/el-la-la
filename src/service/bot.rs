@@ -1,9 +1,9 @@
 use crate::client::telegram::TelegramClient;
-use crate::domain::{Gender, Noun, User, UserPlay};
+use crate::domain::{Noun, User, UserPlay};
 use crate::repository::nouns::{NounsRepository, NounsRepositoryTrait};
 use crate::repository::user_plays::{UserPlaysRepository, UserPlaysRepositoryTrait};
 use crate::repository::users::{UsersRepository, UsersRepositoryTrait};
-use frankenstein::{Update, UpdateContent};
+use frankenstein::{Message, Update, UpdateContent};
 use rand::Rng;
 use std::env::VarError::NotPresent;
 use std::error::Error;
@@ -29,24 +29,28 @@ impl BotService {
     pub fn run(&mut self, update_receiver: Receiver<Update>) -> Result<(), Box<dyn Error>> {
         for update in update_receiver {
             if let UpdateContent::Message(message) = update.content {
-                let chat_id: i64 = message.chat.id;
-                let telegram_user_id: u64 = message.from.unwrap().id;
-                let message_id: i32 = message.message_id;
-                self.ensure_user_exists(telegram_user_id)?;
-
-                match message.text.as_deref() {
-                    Some("/stop") => self.handle_stop_command(chat_id, telegram_user_id)?,
-                    Some("/help") => self.handle_help_command(chat_id)?,
-                    Some("/start") => self.handle_start_command(chat_id, telegram_user_id)?,
-                    Some("/stats") => self.handle_stats_command(chat_id)?,
-                    Some(text) => {
-                        self.handle_text_answer(text, chat_id, telegram_user_id, message_id)?
-                    }
-                    _ => (),
-                }
+                self.handle_update(message)
+                    .inspect_err(|e| eprintln!("Error handling update: {}", e))
+                    .ok();
             }
         }
         Ok(())
+    }
+
+    fn handle_update(&mut self, message: Message) -> Result<(), Box<dyn Error>> {
+        let chat_id: i64 = message.chat.id;
+        let telegram_user_id: u64 = message.from.unwrap().id;
+        let message_id: i32 = message.message_id;
+        self.ensure_user_exists(telegram_user_id)?;
+
+        match message.text.as_deref() {
+            Some("/stop") => self.handle_stop_command(chat_id, telegram_user_id),
+            Some("/help") => self.handle_help_command(chat_id),
+            Some("/start") => self.handle_start_command(chat_id, telegram_user_id),
+            Some("/stats") => self.handle_stats_command(chat_id),
+            Some(text) => self.handle_text_answer(text, chat_id, telegram_user_id, message_id),
+            _ => Ok(()),
+        }
     }
 
     fn handle_stats_command(&mut self, chat_id: i64) -> Result<(), Box<dyn Error>> {
@@ -153,7 +157,10 @@ impl BotService {
             /stop -> Stop the game\n\
             /stats -> Check your current playing statistics\n\
             ";
-        self.telegram_client.send_message(chat_id, text).map(|_| ()).map_err(|e| e.into())
+        self.telegram_client
+            .send_message(chat_id, text)
+            .map(|_| ())
+            .map_err(|e| e.into())
     }
 
     fn handle_text_answer(
@@ -177,21 +184,15 @@ impl BotService {
     ) -> Result<(), Box<dyn Error>> {
         let current_play: UserPlay = self.get_current_play(telegram_user_id)?;
         let playing_noun: Noun = self.nouns_repo.get(current_play.noun_id)?;
-        let correct_answer: &str = match playing_noun.gender {
-            Gender::Masculine => "Masculine",
-            Gender::Feminine => "Feminine",
-            Gender::Any => "Any",
-        };
-        let is_correct: bool = text_answer == correct_answer;
-        self.user_plays_repo.update(current_play.id, is_correct)?;
-        let reacting_emoji: &str = if is_correct {
+        let is_correct_guess: bool = playing_noun.gender.is_match(text_answer);
+        self.user_plays_repo
+            .update(current_play.id, is_correct_guess)?;
+        let reacting_emoji: &str = if is_correct_guess {
             self.get_random_positive_reaction()
         } else {
             "💩"
         };
-        self.telegram_client
-            .send_reaction(chat_id, message_id, reacting_emoji)?;
-        Ok(())
+        self.telegram_client.send_reaction(chat_id, message_id, reacting_emoji)
     }
 
     fn get_random_positive_reaction(&self) -> &str {

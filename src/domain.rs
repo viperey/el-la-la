@@ -5,6 +5,17 @@ pub enum Gender {
     Any,
 }
 
+impl Gender {
+    pub fn is_match(&self, gender_str: &str) -> bool {
+        matches!(
+            (self, gender_str.to_lowercase().as_str()),
+            (Gender::Masculine, "masculine")
+                | (Gender::Feminine, "feminine")
+                | (Gender::Any, "any")
+        )
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Noun {
     pub id: i32,
