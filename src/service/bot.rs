@@ -4,6 +4,7 @@ use crate::repository::nouns::{NounsRepository, NounsRepositoryTrait};
 use crate::repository::user_plays::{UserPlaysRepository, UserPlaysRepositoryTrait};
 use crate::repository::users::{UsersRepository, UsersRepositoryTrait};
 use frankenstein::{Update, UpdateContent};
+use rand::Rng;
 use std::env::VarError::NotPresent;
 use std::error::Error;
 use std::sync::mpsc::Receiver;
@@ -30,6 +31,7 @@ impl BotService {
             if let UpdateContent::Message(message) = update.content {
                 let chat_id: i64 = message.chat.id;
                 let telegram_user_id: u64 = message.from.unwrap().id;
+                let message_id: i32 = message.message_id;
                 self.ensure_user_exists(telegram_user_id)?;
 
                 match message.text.as_deref() {
@@ -37,7 +39,9 @@ impl BotService {
                     Some("/help") => self.handle_help_command(chat_id),
                     Some("/start") => self.handle_start_command(chat_id, telegram_user_id)?,
                     Some("/stats") => self.handle_stats_command(chat_id)?,
-                    Some(text) => self.handle_text_answer(text, chat_id, telegram_user_id)?,
+                    Some(text) => {
+                        self.handle_text_answer(text, chat_id, telegram_user_id, message_id)?
+                    }
                     _ => (),
                 }
             }
@@ -157,8 +161,9 @@ impl BotService {
         text_answer: &str,
         chat_id: i64,
         telegram_user_id: u64,
+        message_id: i32,
     ) -> Result<(), Box<dyn Error>> {
-        self.handle_current_guess(text_answer, chat_id, telegram_user_id)?;
+        self.handle_current_guess(text_answer, chat_id, telegram_user_id, message_id)?;
         self.send_next_guess(chat_id, telegram_user_id)?;
         Ok(())
     }
@@ -168,6 +173,7 @@ impl BotService {
         text_answer: &str,
         chat_id: i64,
         telegram_user_id: u64,
+        message_id: i32,
     ) -> Result<(), Box<dyn Error>> {
         let current_play: UserPlay = self.get_current_play(telegram_user_id)?;
         let playing_noun: Noun = self.nouns_repo.get(current_play.noun_id)?;
@@ -178,9 +184,20 @@ impl BotService {
         };
         let is_correct: bool = text_answer == correct_answer;
         self.user_plays_repo.update(current_play.id, is_correct)?;
-        let message_text: &str = if is_correct { "Correct!" } else { "Wrong!" };
-        self.telegram_client.send_message(chat_id, message_text)?;
+        let reacting_emoji: &str = if is_correct {
+            self.get_random_positive_reaction()
+        } else {
+            "💩"
+        };
+        self.telegram_client
+            .send_reaction(chat_id, message_id, reacting_emoji)?;
         Ok(())
+    }
+
+    fn get_random_positive_reaction(&self) -> &str {
+        let reactions: Vec<&str> = vec!["👍", "👌", "🔥", "👏", "💯", "🏆"];
+        let random_index: usize = rand::thread_rng().gen_range(0..reactions.len());
+        reactions[random_index]
     }
 
     fn get_current_play(&mut self, telegram_user_id: u64) -> Result<UserPlay, Box<dyn Error>> {

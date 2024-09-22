@@ -1,4 +1,8 @@
-use frankenstein::{Api, BotCommand, GetUpdatesParams, KeyboardButton, Message, MethodResponse, ReplyKeyboardMarkup, ReplyMarkup, SendMessageParams, SetMyCommandsParams, TelegramApi, Update};
+use frankenstein::{
+    Api, BotCommand, GetUpdatesParams, KeyboardButton, Message, MethodResponse, ReactionType,
+    ReactionTypeEmoji, ReplyKeyboardMarkup, ReplyMarkup, SendMessageParams,
+    SetMessageReactionParams, SetMyCommandsParams, TelegramApi, Update,
+};
 use std::error::Error;
 use std::sync::mpsc::Sender;
 use std::{env, thread};
@@ -24,6 +28,22 @@ impl TelegramClient {
             api,
             question_keyboard,
         }
+    }
+
+    pub fn send_reaction(
+        &self,
+        chat_id: i64,
+        message_id: i32,
+        reaction: &str,
+    ) -> Result<MethodResponse<bool>, frankenstein::Error> {
+        let set_message_reaction_params = SetMessageReactionParams::builder()
+            .chat_id(chat_id)
+            .message_id(message_id)
+            .reaction(vec![ReactionType::Emoji(ReactionTypeEmoji {
+                emoji: reaction.to_string(),
+            })])
+            .build();
+        self.api.set_message_reaction(&set_message_reaction_params)
     }
 
     pub fn send_message(
@@ -52,7 +72,7 @@ impl TelegramClient {
 
         self.api.send_message(&send_message_params)
     }
-    
+
     fn set_bot_commands(api: &Api) -> Result<(), Box<dyn Error>> {
         let commands = vec![
             BotCommand::builder()
@@ -79,7 +99,7 @@ impl TelegramClient {
 
         Ok(())
     }
-    
+
     fn poll_updates(api: Api, update_sender: Sender<Update>) {
         let mut update_params: GetUpdatesParams = GetUpdatesParams::builder().timeout(10).build();
 

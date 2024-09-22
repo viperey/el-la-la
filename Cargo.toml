@@ -8,3 +8,4 @@ refinery = { version = "0.8.14", features = ["mysql"] }
 mysql = { version = "24.0.0"}
 dotenv = "0.15.0"
 frankenstein = "0.34.0"
+rand = "0.8.5"
