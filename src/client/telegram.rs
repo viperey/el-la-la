@@ -17,13 +17,11 @@ impl TelegramClient {
         let token: String = env::var("TELEGRAM_BOT_TOKEN").expect("Bot token not found");
         let api: Api = Api::new(token.as_str());
         let question_keyboard: ReplyMarkup = Self::build_keyboard();
-
         let api_clone: Api = api.clone();
-        thread::spawn(move || {
-            Self::poll_updates(api_clone, channel_sender);
-        });
 
         Self::set_bot_commands(&api).expect("Failed to set bot commands");
+        thread::spawn(move || Self::poll_updates(api_clone, channel_sender));
+
         Self {
             api,
             question_keyboard,
@@ -94,10 +92,7 @@ impl TelegramClient {
         ];
 
         let params = SetMyCommandsParams::builder().commands(commands).build();
-
-        api.set_my_commands(&params)?;
-
-        Ok(())
+        api.set_my_commands(&params).map(|_| ()).map_err(|e| e.into())
     }
 
     fn poll_updates(api: Api, update_sender: Sender<Update>) {
